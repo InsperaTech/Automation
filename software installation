@@ -1,0 +1,72 @@
+cls
+
+# Get the Server List from the below location:
+$Serverlist = Get-Content "D:\ODBC\servers.txt"
+$ApplicationName = "YourApplication"  # Replace with the actual application name
+$InstallerFileName = "YourInstaller.msi"  # Replace with the actual installer file name
+$InstallerPath = "################Provide the INSTALLER FILE LOCATION #####################"
+
+# Check if the application is installed:
+foreach ($ServerName in $Serverlist) {
+    $session = New-PSSession -ComputerName $ServerName
+
+    $ApplicationInstalled = Invoke-Command -Session $session -ScriptBlock {
+        Get-WmiObject "win32_product" | Where-Object { $_.Name -match $using:ApplicationName }
+    }
+
+    if ($ApplicationInstalled) {
+        Write-Host "$ApplicationName is already installed on $ServerName"
+    } else {
+        Write-Host "$ApplicationName is not installed on $ServerName"
+    }
+
+    Remove-PSSession -Session $session
+}
+
+# Install the application:
+foreach ($ServerName in $Serverlist) {
+    $session = New-PSSession -ComputerName $ServerName
+
+    $ApplicationInstalled = Invoke-Command -Session $session -ScriptBlock {
+        Get-WmiObject "win32_product" | Where-Object { $_.Name -match $using:ApplicationName }
+    }
+
+    if ($ApplicationInstalled) {
+        Write-Host "$ApplicationName is already installed on $ServerName"
+    } else {
+        # Copy the installer
+        try {
+            $binaryPath = "\\$ServerName\E$\$InstallerFileName"
+            if (Test-Path $binaryPath) {
+                Write-Host -ForegroundColor Green "$InstallerFileName already exists on $ServerName"
+            } else {
+                Write-Host -ForegroundColor Green "Copying $InstallerFileName for $ServerName"
+                Copy-Item $InstallerPath "\\$ServerName\E$\" -Recurse -Force
+                Write-Host -ForegroundColor Green "$InstallerFileName successfully copied to $ServerName"
+            }
+        } catch {
+            Write-Host "Media copy failed" -ForegroundColor Red 
+            exit
+        }
+
+        # Install the application
+        Invoke-Command -Session $session -ScriptBlock {
+            cd E:\
+            Start-Process -FilePath "msiexec.exe" -ArgumentList "/i", "$using:InstallerFileName", "/quiet", "/norestart" -Wait
+        }
+
+        Write-Host -ForegroundColor Green "$ApplicationName is installed on $ServerName"
+
+        # Delete the installer
+        Start-Sleep -Seconds 30
+
+        if (Test-Path "\\$ServerName\E$\$InstallerFileName") {
+            Remove-Item "\\$ServerName\E$\$InstallerFileName" -Recurse -Force
+            Write-Host -ForegroundColor Green "$InstallerFileName Removed from $ServerName"
+        } else {
+            Write-Host -ForegroundColor Red "$InstallerFileName not available on $ServerName"
+        }
+
+        Remove-PSSession -Session $session
+    }
+}
