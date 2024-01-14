@@ -6,6 +6,13 @@ $ApplicationName = "YourApplication"  # Replace with the actual application name
 $InstallerFileName = "YourInstaller.msi"  # Replace with the actual installer file name
 $InstallerPath = "################Provide the INSTALLER FILE LOCATION #####################"
 
+
+# Specify Windows login credentials
+$Username = "YourWindowsUsername"  # Replace with the actual Windows username
+$Password = ConvertTo-SecureString "YourPassword" -AsPlainText -Force  # Replace with the actual password
+$Credentials = New-Object System.Management.Automation.PSCredential($Username, $Password)
+
+
 # Check if the application is installed:
 foreach ($ServerName in $Serverlist) {
     $session = New-PSSession -ComputerName $ServerName
