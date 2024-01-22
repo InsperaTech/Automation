@@ -1,0 +1,3 @@
+from email.mime.application import MIMEApplication
+  part = MIMEApplication(file.read(), Name=filename)
+    part['Content-Disposition'] = 'attachment; filename="{}"'.format(filename)
