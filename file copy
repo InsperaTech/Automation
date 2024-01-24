@@ -1,12 +1,7 @@
 import shutil
-import os
 
 def move_folders(src_folder, dest_folder):
     try:
-        # If the destination folder doesn't exist, create it
-        if not os.path.exists(dest_folder):
-            os.makedirs(dest_folder)
-        
         # Get a list of all items (files and subfolders) in the source folder
         items = os.listdir(src_folder)
         
@@ -24,7 +19,7 @@ def move_folders(src_folder, dest_folder):
         print(f"An error occurred: {e}")
 
 # Example usage:
-source_folder = '/path/to/source/folder'
-destination_folder = '/path/to/destination/folder'
+source_folder = r'C:\programs\data'
+destination_folder = r'D:\programfiles\backup'
 
 move_folders(source_folder, destination_folder)
