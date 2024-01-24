@@ -1,0 +1,20 @@
+import shutil
+import os
+
+def copy_folder(src_folder, dest_folder):
+    try:
+        # If the destination folder already exists, remove it
+        if os.path.exists(dest_folder):
+            shutil.rmtree(dest_folder)
+        
+        # Copy the entire folder from source to destination
+        shutil.copytree(src_folder, dest_folder)
+        print(f"Folder '{src_folder}' successfully copied to '{dest_folder}'.")
+    except Exception as e:
+        print(f"An error occurred: {e}")
+
+# Example usage:
+source_folder = '/path/to/source/folder'
+destination_folder = '/path/to/destination/folder'
+
+copy_folder(source_folder, destination_folder)
