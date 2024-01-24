@@ -1,15 +1,25 @@
 import shutil
 import os
 
-def copy_folder(src_folder, dest_folder):
+def move_folders(src_folder, dest_folder):
     try:
-        # If the destination folder already exists, remove it
-        if os.path.exists(dest_folder):
-            shutil.rmtree(dest_folder)
+        # If the destination folder doesn't exist, create it
+        if not os.path.exists(dest_folder):
+            os.makedirs(dest_folder)
         
-        # Copy the entire folder from source to destination
-        shutil.copytree(src_folder, dest_folder)
-        print(f"Folder '{src_folder}' successfully copied to '{dest_folder}'.")
+        # Get a list of all items (files and subfolders) in the source folder
+        items = os.listdir(src_folder)
+        
+        # Move each item to the destination folder
+        for item_name in items:
+            src_path = os.path.join(src_folder, item_name)
+            dest_path = os.path.join(dest_folder, item_name)
+            
+            # If the item is a folder, move it recursively
+            if os.path.isdir(src_path):
+                shutil.move(src_path, dest_path)
+        
+        print(f"Folders from '{src_folder}' successfully moved to '{dest_folder}'.")
     except Exception as e:
         print(f"An error occurred: {e}")
 
@@ -17,4 +27,4 @@ def copy_folder(src_folder, dest_folder):
 source_folder = '/path/to/source/folder'
 destination_folder = '/path/to/destination/folder'
 
-copy_folder(source_folder, destination_folder)
+move_folders(source_folder, destination_folder)
