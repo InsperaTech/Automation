@@ -1,0 +1,59 @@
+import os
+from tableauserverclient import Server, ConnectionCredentials
+
+# Tableau Server information
+tableau_server = "https://your-tableau-server"
+username = "your-username"
+password = "your-password"
+
+# Path to the archive folder
+archive_folder = "/path/to/archive/folder"
+
+# Dictionary mapping content owners to their respective files
+content_owners = {
+    'owner1': 'file1.twb',
+    'owner2': 'file2.twb',
+    # Add more owner-file mappings as needed
+}
+
+def assign_permissions(server, project_id, item_id, owner):
+    # Define permissions as needed, this is just an example
+    permissions = {
+        'granteeCapabilities': [
+            {
+                'grantee': {
+                    'id': server.users.get_by_name(owner).id,
+                    'type': 'user',
+                },
+                'capabilities': ['Read'],
+            },
+        ],
+    }
+
+    # Update permissions for the specific item (workbook or datasource)
+    server.workbooks.update_permissions(item_id, permissions)
+
+def main():
+    # Connect to Tableau Server
+    server = Server(tableau_server)
+    server.auth.sign_in(ConnectionCredentials(username, password, embed=True))
+
+    # Iterate through content owners and assign permissions
+    for owner, file_name in content_owners.items():
+        # Assume all files are workbooks for simplicity
+        file_path = os.path.join(archive_folder, file_name)
+
+        # Find the workbook on Tableau Server by name
+        workbook_item = server.workbooks.get_by_name(file_name)
+
+        if workbook_item:
+            assign_permissions(server, workbook_item.project_id, workbook_item.id, owner)
+            print(f"Assigned permissions for '{file_name}' to '{owner}'")
+        else:
+            print(f"Workbook '{file_name}' not found on Tableau Server.")
+
+    # Sign out from Tableau Server
+    server.auth.sign_out()
+
+if __name__ == "__main__":
+    main()
