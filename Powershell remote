@@ -1,0 +1,23 @@
+# Define the source file path
+$sourceFile = "\\SourceServer\Share\File.txt"
+
+# Define an array of destination servers
+$destinationServers = @("DestinationServer1", "DestinationServer2", "DestinationServer3")
+
+# Loop through each destination server
+foreach ($destinationServer in $destinationServers) {
+    try {
+        # Establish a PowerShell remoting session to the destination server
+        $session = New-PSSession -ComputerName $destinationServer
+
+        # Copy the file to the destination server
+        Copy-Item -Path $sourceFile -Destination "C:\DestinationPath\" -ToSession $session -Force
+
+        Write-Output "File copied successfully to $destinationServer"
+    } catch {
+        Write-Error "Failed to copy file to $destinationServer. $_"
+    } finally {
+        # Close the PowerShell remoting session
+        Remove-PSSession $session
+    }
+}
