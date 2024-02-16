@@ -1,5 +1,5 @@
 # Define the source file path
-$sourceFile = "\\SourceServer\Share\File.txt"
+$sourceFile = "\\SourceServer\Share\YourInstaller.msi"
 
 # Define an array of destination servers
 $destinationServers = @("DestinationServer1", "DestinationServer2", "DestinationServer3")
@@ -8,6 +8,13 @@ $destinationServers = @("DestinationServer1", "DestinationServer2", "Destination
 $username = "YourUsername"
 $password = ConvertTo-SecureString "YourPassword" -AsPlainText -Force
 $credentials = New-Object System.Management.Automation.PSCredential($username, $password)
+
+# Email details
+$smtpServer = "your_smtp_server"
+$senderEmail = "sender@example.com"
+$recipientEmail = "recipient@example.com"
+$subject = "Software Installation Completed"
+$body = "The software installation process has completed successfully."
 
 # Loop through each destination server
 foreach ($destinationServer in $destinationServers) {
@@ -20,15 +27,23 @@ foreach ($destinationServer in $destinationServers) {
 
         # Install the software on the destination server
         Invoke-Command -Session $session -ScriptBlock {
-            $sourceFilePath = "C:\DestinationPath\File.txt"
-            # Add your installation command here
-            # Example: Start-Process -FilePath "msiexec.exe" -ArgumentList "/i `"$sourceFilePath`" /quiet" -Wait
+            param($sourceFilePath)
+            Start-Process -FilePath "msiexec.exe" -ArgumentList "/i `"$sourceFilePath`" /quiet" -Wait
             Write-Output "Software installed on $($env:COMPUTERNAME)"
-        }
+            # Delete the file from the destination server after installation
+            Remove-Item -Path $sourceFilePath -Force
+            Write-Output "File deleted from $($env:COMPUTERNAME)"
+        } -ArgumentList "C:\DestinationPath\YourInstaller.msi"
 
-        Write-Output "File copied and software installed successfully on $destinationServer"
+        Write-Output "File copied, software installed, and file deleted successfully on $destinationServer"
+
+        # Send email notification
+        Send-MailMessage -SmtpServer $smtpServer -From $senderEmail -To $recipientEmail -Subject $subject -Body $body
+
+        Write-Output "Email notification sent successfully."
+
     } catch {
-        Write-Error "Failed to copy file or install software on $destinationServer. $_"
+        Write-Error "Failed to copy file, install software, delete file, or send email on $destinationServer. $_"
     } finally {
         # Close the PowerShell remoting session
         Remove-PSSession $session
