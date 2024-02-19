@@ -1,3 +1,9 @@
+# Define log file path
+$logFilePath = "C:\InstallationLogs\InstallationLog_$(Get-Date -Format 'yyyyMMdd_HHmmss').txt"
+
+# Start transcript to capture output to log file
+Start-Transcript -Path $logFilePath
+
 # Define the source file path for the new version installer
 $sourceFileNewVersion = "\\SourceServer\Share\YourNewInstaller.msi"
 
@@ -33,8 +39,10 @@ foreach ($destinationServer in $destinationServers) {
 
         if ($uninstallResult -eq 0) {
             $uninstallStatus = "Old version uninstalled successfully"
+        } elseif ($uninstallResult -eq $null) {
+            $uninstallStatus = "Old version not found"
         } else {
-            $uninstallStatus = "Old version not found or failed to uninstall"
+            $uninstallStatus = "Failed to uninstall old version (Error code: $uninstallResult)"
         }
 
         # Copy the new version installer to the destination server
@@ -67,3 +75,6 @@ foreach ($destinationServer in $destinationServers) {
         Remove-PSSession $session
     }
 }
+
+# Stop transcript
+Stop-Transcript
