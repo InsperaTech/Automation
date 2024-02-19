@@ -1,0 +1,10 @@
+$oldVersionDisplayName = "Old Software Name"
+$newInstallerPath = "Path\to\new\version\installer.msi"
+
+# Uninstall old version if it exists
+$uninstallCommand = Get-WmiObject -Class Win32_Product | Where-Object { $_.Name -eq $oldVersionDisplayName } | ForEach-Object { $_.Uninstall() }
+if ($uninstallCommand -eq 0) {
+    Write-Host "Old version uninstalled successfully"
+} else {
+    Write-Host "Old version not found or failed to uninstall"
+}
