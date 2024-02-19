@@ -1,9 +1,3 @@
-# Define log file path
-$logFilePath = "C:\InstallationLogs\InstallationLog_$(Get-Date -Format 'yyyyMMdd_HHmmss').txt"
-
-# Start transcript to capture output to log file
-Start-Transcript -Path $logFilePath
-
 # Define the source file path for the new version installer
 $sourceFileNewVersion = "\\SourceServer\Share\YourNewInstaller.msi"
 
@@ -24,9 +18,30 @@ $senderEmail = "sender@example.com"
 $recipientEmail = "recipient@example.com"
 $subject = "Software Installation Status"
 
+# Log file path
+$logFilePath = "C:\InstallationLogs\installation_log_$(Get-Date -Format 'yyyyMMdd_HHmmss').txt"
+
+# Create log directory if it doesn't exist
+$logDirectory = Split-Path $logFilePath
+if (-not (Test-Path -Path $logDirectory)) {
+    New-Item -Path $logDirectory -ItemType Directory | Out-Null
+}
+
+# Function to write log message
+function Write-Log {
+    param (
+        [string]$Message
+    )
+    $TimeStamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
+    $LogMessage = "$TimeStamp - $Message"
+    Add-Content -Path $logFilePath -Value $LogMessage
+}
+
 # Loop through each destination server
 foreach ($destinationServer in $destinationServers) {
     try {
+        Write-Log "Processing installation on $destinationServer"
+        
         # Establish a PowerShell remoting session to the destination server using provided credentials
         $session = New-PSSession -ComputerName $destinationServer -Credential $credentials
 
@@ -44,11 +59,15 @@ foreach ($destinationServer in $destinationServers) {
         } else {
             $uninstallStatus = "Failed to uninstall old version (Error code: $uninstallResult)"
         }
+        Write-Log $uninstallStatus
 
         # Copy the new version installer to the destination server
+        Write-Log "Copying installer to $destinationServer"
         Copy-Item -Path $sourceFileNewVersion -Destination "C:\DestinationPath\" -ToSession $session -Force
+        Write-Log "Installer copied successfully to $destinationServer"
 
         # Install the new version software on the destination server
+        Write-Log "Installing new version on $destinationServer"
         $installResult = Invoke-Command -Session $session -ScriptBlock {
             param($sourceFilePath)
             Start-Process -FilePath "msiexec.exe" -ArgumentList "/i `"$sourceFilePath`" /quiet" -Wait
@@ -60,6 +79,7 @@ foreach ($destinationServer in $destinationServers) {
         } else {
             $installStatus = "Failed to install new version"
         }
+        Write-Log $installStatus
 
         # Send email notification with uninstall and install status
         $body = "Destination Server: $destinationServer`r`n" +
@@ -70,11 +90,11 @@ foreach ($destinationServer in $destinationServers) {
 
     } catch {
         Write-Error "Failed to process installation on $destinationServer. $_"
+        Write-Log "Failed to process installation on $destinationServer. $_"
     } finally {
         # Close the PowerShell remoting session
         Remove-PSSession $session
     }
 }
 
-# Stop transcript
-Stop-Transcript
+Write-Output "Installation process completed. Log file saved at: $logFilePath"
