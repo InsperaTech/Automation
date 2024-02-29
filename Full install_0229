@@ -48,8 +48,13 @@ foreach ($destinationServer in $destinationServers) {
         # Check if the old version exists and uninstall it if found
         $uninstallResult = Invoke-Command -Session $session -ScriptBlock {
             param($oldDisplayName)
-            $uninstallCommand = Get-WmiObject -Class Win32_Product | Where-Object { $_.Name -eq $oldDisplayName } | ForEach-Object { $_.Uninstall() }
-            return $uninstallCommand
+            try {
+                $uninstallCommand = Get-WmiObject -Class Win32_Product -Filter "Name='$oldDisplayName'" | ForEach-Object { $_.Uninstall() }
+                return $uninstallCommand
+            } catch {
+                Write-Error "Error during uninstallation: $_"
+                return $_.Exception.Message
+            }
         } -ArgumentList $oldVersionDisplayName
 
         if ($uninstallResult -eq 0) {
@@ -57,7 +62,7 @@ foreach ($destinationServer in $destinationServers) {
         } elseif ($uninstallResult -eq $null) {
             $uninstallStatus = "Old version not found"
         } else {
-            $uninstallStatus = "Failed to uninstall old version (Error code: $uninstallResult)"
+            $uninstallStatus = "Failed to uninstall old version (Error: $uninstallResult)"
         }
         Write-Log $uninstallStatus
 
