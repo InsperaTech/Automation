@@ -1,5 +1,7 @@
 # Define the source file path for the new version installer
 $sourceFileNewVersion = "\\SourceServer\Share\YourNewInstaller.msi"
+$driverpath = "E:\Install\Drivers\mysql-connector-odbc-8.3.0. msi"
+$destinationpath = "E:\Install\Drivers"
 
 # Define the display name of the old version software
 $oldVersionDisplayName = "Old Software Name"
@@ -24,7 +26,7 @@ $logFilePath = "C:\InstallationLogs\installation_log_$(Get-Date -Format 'yyyyMMd
 # Create log directory if it doesn't exist
 $logDirectory = Split-Path $logFilePath
 if (-not (Test-Path -Path $logDirectory)) {
-    New-Item -Path $logDirectory -ItemType Directory | Out-Null
+    New-Item -Path $logDirectory -ItemType Directory -Force | Out-Null
 }
 
 # Function to write log message
@@ -37,61 +39,74 @@ function Write-Log {
     Add-Content -Path $logFilePath -Value $LogMessage
 }
 
+
 # Loop through each destination server
 foreach ($destinationServer in $destinationServers) {
     try {
-        Write-Log "Processing installation on $destinationServer"
         
         # Establish a PowerShell remoting session to the destination server using provided credentials
         $session = New-PSSession -ComputerName $destinationServer -Credential $credentials
 
+        # Get the computer name of the session
+        $sessionComputerName = Invoke-Command -Session $session -ScriptBlock {
+            return $env:COMPUTERNAME
+        }
+
+        # Log the session computer name
+        Write-Log "Session Computer Name: $sessionComputerName"
+        Write-Log "Processing installation on $destinationServer"
+
         # Check if the old version exists and uninstall it if found
         $uninstallResult = Invoke-Command -Session $session -ScriptBlock {
             param($oldDisplayName)
-            try {
-                $uninstallCommand = Get-WmiObject -Class Win32_Product -Filter "Name='$oldDisplayName'" | ForEach-Object { $_.Uninstall() }
-                return $uninstallCommand
+            try
+            {
+            $uninstallCommand = Get-WmiObject -Class Win32_Product | Where-Object { $_.Name -eq $oldDisplayName } | ForEach-Object { $_.Uninstall() }
+            return $uninstallCommand
             } catch {
-                Write-Error "Error during uninstallation: $_"
-                return $_.Exception.Message
-            }
+            return $._Exception.Message }
         } -ArgumentList $oldVersionDisplayName
 
-        if ($uninstallResult -eq 0) {
+        if ($null -eq $uninstallResult){
+        $uninstllStatus = "Old version uninstalled successfully"
+        } elseif ($uninstallResult -eq 0) {
             $uninstallStatus = "Old version uninstalled successfully"
         } elseif ($uninstallResult -eq $null) {
             $uninstallStatus = "Old version not found"
         } else {
-            $uninstallStatus = "Failed to uninstall old version (Error: $uninstallResult)"
+            $uninstallStatus = "Failed to uninstall old version (Error code: $uninstallResult)"
         }
         Write-Log $uninstallStatus
 
         # Copy the new version installer to the destination server
         Write-Log "Copying installer to $destinationServer"
-        Copy-Item -Path $sourceFileNewVersion -Destination "C:\DestinationPath\" -ToSession $session -Force
+        Copy-Item -Path $sourceFileNewVersion -Destination $destinationpath -ToSession $session -Force
         Write-Log "Installer copied successfully to $destinationServer"
 
         # Install the new version software on the destination server
         Write-Log "Installing new version on $destinationServer"
         $installResult = Invoke-Command -Session $session -ScriptBlock {
-            param($sourceFilePath)
-            Start-Process -FilePath "msiexec.exe" -ArgumentList "/i `"$sourceFilePath`" /quiet" -Wait
-            return $?
-        } -ArgumentList "C:\DestinationPath\YourNewInstaller.msi"
+        param($sourceFilePath)
+        Start-Process -FilePath "msiexec.exe" -ArgumentList "/i `"$sourceFilePath`" /quiet" -Wait -ErrorAction Stop
+        return $?
+        } -ArgumentList $driverpath
 
         if ($installResult) {
-            $installStatus = "New version installed successfully"
+        $installStatus = "New version installed successfully"
         } else {
-            $installStatus = "Failed to install new version"
-        }
-        Write-Log $installStatus
+                $installStatus = "Failed to install new version"
+            }
+            Write-Log $installStatus
+
+            Write-Log " "
 
         # Send email notification with uninstall and install status
         $body = "Destination Server: $destinationServer`r`n" +
+                "Session Computer Name: $sessionComputerName`r`n" +
                 "Uninstall Status: $uninstallStatus`r`n" +
                 "Install Status: $installStatus"
 
-        Send-MailMessage -SmtpServer $smtpServer -From $senderEmail -To $recipientEmail -Subject $subject -Body $body
+         Send-MailMessage -SmtpServer $smtpServer -From $senderEmail -To $recipientEmail -Subject $subject -Body $body
 
     } catch {
         Write-Error "Failed to process installation on $destinationServer. $_"
@@ -103,3 +118,4 @@ foreach ($destinationServer in $destinationServers) {
 }
 
 Write-Output "Installation process completed. Log file saved at: $logFilePath"
+        
