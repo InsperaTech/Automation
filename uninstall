@@ -1,0 +1,80 @@
+# Loop through each destination server
+foreach ($destinationServer in $destinationServers) {
+    try {
+        
+        # Establish a PowerShell remoting session to the destination server using provided credentials
+        $session = New-PSSession -ComputerName $destinationServer -Credential $credentials
+
+        # Get the computer name of the session
+        $sessionComputerName = Invoke-Command -Session $session -ScriptBlock {
+            return $env:COMPUTERNAME
+        }
+
+        # Log the session computer name
+        Write-Log "Session Computer Name: $sessionComputerName"
+        Write-Log "Processing installation on $destinationServer"
+
+        # Check if the old version exists and uninstall it if found
+        $uninstallResult = Invoke-Command -Session $session -ScriptBlock {
+            param($oldDisplayName)
+            try {
+                $uninstallCommand = Get-WmiObject -Class Win32_Product | Where-Object { $_.Name -eq $oldDisplayName } | ForEach-Object { $_.Uninstall() }
+                if ($uninstallCommand -eq $null) {
+                    return "Old version uninstalled successfully"
+                } else {
+                    return "Failed to uninstall old version (Error code: $($uninstallCommand.ReturnValue))"
+                }
+            } catch {
+                return "Failed to uninstall old version (Error: $_)"
+            }
+        } -ArgumentList $oldVersionDisplayName
+
+        Write-Log $uninstallResult
+
+        # If uninstallation fails, continue with the installation
+        if ($uninstallResult -notlike "*uninstalled successfully*") {
+            # Copy the new version installer to the destination server
+            Write-Log "Copying installer to $destinationServer"
+            Copy-Item -Path $sourceFileNewVersion -Destination $destinationpath -ToSession $session -Force
+            Write-Log "Installer copied successfully to $destinationServer"
+
+            # Install the new version software on the destination server
+            Write-Log "Installing new version on $destinationServer"
+            $installResult = Invoke-Command -Session $session -ScriptBlock {
+                param($sourceFilePath)
+                try {
+                    Start-Process -FilePath "msiexec.exe" -ArgumentList "/i `"$sourceFilePath`" /quiet" -Wait -ErrorAction Stop
+                    return $true
+                } catch {
+                    return $false
+                }
+            } -ArgumentList $driverpath
+
+            if ($installResult) {
+                $installStatus = "New version installed successfully"
+            } else {
+                $installStatus = "Failed to install new version"
+            }
+            Write-Log $installStatus
+
+            Write-Log " "
+
+            # Send email notification with uninstall and install status
+            $body = "Destination Server: $destinationServer`r`n" +
+                    "Session Computer Name: $sessionComputerName`r`n" +
+                    "Uninstall Status: $uninstallResult`r`n" +
+                    "Install Status: $installStatus"
+
+            Send-MailMessage -SmtpServer $smtpServer -From $senderEmail -To $recipientEmail -Subject $subject -Body $body
+        } else {
+            Write-Log "No need to install new version as old version is uninstalled successfully"
+        }
+
+    } catch {
+        Write-Error "Failed to process installation on $destinationServer. $_"
+        Write-Log "Failed to process installation on $destinationServer. $_"
+    } finally {
+        # Close the PowerShell remoting session
+        Remove-PSSession $session
+    }
+}
