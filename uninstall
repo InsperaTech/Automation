@@ -1,27 +1,19 @@
-# Uninstall the old version if found
 $uninstallResult = Invoke-Command -Session $session -ScriptBlock {
     param($oldDisplayName)
+    try {
+        $versionCheck = Get-WmiObject -Class Win32_Product | Where-Object { $_.Name -eq $oldDisplayName } | Select-Object Name
 
-    # Check if software exists
-    $versionCheck = Get-WmiObject -Class Win32_Product | Where-Object { $_.Name -eq $oldDisplayName }
-
-    if ($versionCheck -eq $null) {
-        $uninstallResult = "Software doesn't exist"
-    } else {
-        # Attempt to uninstall
-        try {
-            $uninstallResult = Get-WmiObject -Class Win32_Product | Where-Object { $_.Name -eq $oldDisplayName } | ForEach-Object { $_.Uninstall() }
-            if ($uninstallResult) {
-                $uninstallResult = "Old version uninstalled successfully"
+        if ($versionCheck -eq $null) {
+            $uninstallResult = "Software doesn't exist"
+        } else {
+            $uninstallCommand = Get-WmiObject -Class Win32_Product | Where-Object { $_.Name -eq $oldDisplayName } | ForEach-Object { $_.Uninstall() }
+            if ($uninstallCommand -eq $null) {
+                return "Old version uninstalled successfully"
             } else {
-                # Get the actual error code using $_.ExtendedStatus
-                $errorCode = $_.ExtendedStatus
-                $errorMessage = "Failed to uninstall old version (Error code: $errorCode)"
-                return $errorMessage
+                return "Failed to uninstall old version (Error code: $($uninstallCommand.ReturnValue))"
             }
-        } catch {
-            $errorMessage = "Failed to uninstall old version (Error: $_.Exception.Message)"
-            return $errorMessage
-        }
+        } 
+    } catch {
+        return "Failed to uninstall old version (Error: $_)"
     }
 } -ArgumentList $oldVersionDisplayName
