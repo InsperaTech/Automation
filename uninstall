@@ -17,3 +17,27 @@ $uninstallResult = Invoke-Command -Session $session -ScriptBlock {
         return "Failed to uninstall old version (Error: $_)"
     }
 } -ArgumentList $oldVersionDisplayName
+
+
+newversion:
+-----------------------------------------
+$uninstallResult = Invoke-Command -Session $session -ScriptBlock {
+    param($oldDisplayName)
+    try {
+        $versionCheck = Get-WmiObject -Class Win32_Product | Where-Object { $_.Name -eq $oldDisplayName }
+
+        if ($versionCheck -eq $null) {
+            return "Software doesn't exist"
+        } else {
+            $uninstallResult = $versionCheck.Uninstall()
+
+            if ($uninstallResult -eq $null) {
+                return "Old version uninstalled successfully"
+            } else {
+                return "Failed to uninstall old version (Error code: $($uninstallResult.ReturnValue))"
+            }
+        } 
+    } catch {
+        return "Failed to uninstall old version (Error: $_)"
+    }
+} -ArgumentList $oldVersionDisplayName
